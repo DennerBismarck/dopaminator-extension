@@ -1,0 +1,10 @@
+{
+  "name": "Dopaminator",
+  "description": "Your filter for dopamine hits",
+  "version": "1.0",
+  "manifest_version": 3,
+  "action": {
+    "default_popup": "popup/hello.html",
+    "default_icon": "images/hello_extensions.png"
+  }
+}
