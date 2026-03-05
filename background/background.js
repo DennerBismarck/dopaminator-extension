@@ -15,6 +15,33 @@ function matchesDomain(urlDomain, configDomain) {
   return a === b || a.endsWith('.' + b);
 }
 
+// Returns true if the URL matches the site's domain (and optional path prefix)
+function matchesUrl(url, site) {
+  const urlDomain = getDomain(url);
+  if (!urlDomain || !matchesDomain(urlDomain, site.domain)) return false;
+  if (site.pathPrefix) {
+    try {
+      return new URL(url).pathname.startsWith(site.pathPrefix);
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Returns true if the current time falls inside the block window
+function isInBlockWindow(site) {
+  if (!site.schedule) return true; // no schedule = always active
+  const { startHour, endHour } = site.schedule;
+  const h = new Date().getHours();
+  if (startHour <= endHour) {
+    return h >= startHour && h < endHour;
+  } else {
+    // wraps around midnight (e.g. 22 -> 08)
+    return h >= startHour || h < endHour;
+  }
+}
+
 function getToday() {
   return new Date().toISOString().split('T')[0];
 }
@@ -84,18 +111,32 @@ async function setTemporarilyAllowed(domain) {
   }
 }
 
-async function handleUrl(tabId, url) {
-  const urlDomain = getDomain(url);
-  if (!urlDomain) return;
+function blockedUrl(site, originalUrl, reason) {
+  let url = chrome.runtime.getURL('pages/blocked.html') +
+    '?domain=' + encodeURIComponent(site.domain) +
+    '&return=' + encodeURIComponent(originalUrl);
+  if (reason) url += '&reason=' + reason;
+  if (reason === 'time_limit') {
+    // caller adds used/limit params separately
+  }
+  if (site.schedule) {
+    url += '&scheduleStart=' + site.schedule.startHour +
+           '&scheduleEnd=' + site.schedule.endHour;
+  }
+  return url;
+}
 
+async function handleUrl(tabId, url) {
   const sites = await getSites();
-  const site = sites.find(s => matchesDomain(urlDomain, s.domain));
+  const site = sites.find(s => matchesUrl(url, s));
   if (!site) return;
+
+  // If outside the block window, allow through
+  if (!isInBlockWindow(site)) return;
 
   if (site.mode === 'blocked') {
     chrome.tabs.update(tabId, {
-      url: chrome.runtime.getURL('pages/blocked.html') +
-        '?domain=' + encodeURIComponent(site.domain)
+      url: blockedUrl(site, url, 'blocked')
     });
     return;
   }
@@ -106,9 +147,7 @@ async function handleUrl(tabId, url) {
 
     if (usedSeconds >= limitSeconds) {
       chrome.tabs.update(tabId, {
-        url: chrome.runtime.getURL('pages/blocked.html') +
-          '?domain=' + encodeURIComponent(site.domain) +
-          '&reason=time_limit' +
+        url: blockedUrl(site, url, 'time_limit') +
           '&used=' + usedSeconds +
           '&limit=' + limitSeconds
       });
@@ -133,7 +172,6 @@ async function handleUrl(tabId, url) {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (changeInfo.status !== 'loading' || !changeInfo.url) return;
 
-  // Always stop tracking when a tab navigates away
   if (trackingMap.has(tabId)) {
     await stopTracking(tabId);
   }
@@ -159,17 +197,24 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     const site = timeLimitSites.find(s => matchesDomain(entry.domain, s.domain));
     if (!site) continue;
 
+    // If schedule ended, stop tracking but don't block
+    if (!isInBlockWindow(site)) {
+      await stopTracking(tabId);
+      continue;
+    }
+
     const limitSeconds = (site.dailyLimitMinutes || 30) * 60;
     const usedSeconds = await getCurrentUsageSeconds(site.domain);
 
     if (usedSeconds >= limitSeconds) {
       await stopTracking(tabId);
-      chrome.tabs.update(tabId, {
-        url: chrome.runtime.getURL('pages/blocked.html') +
-          '?domain=' + encodeURIComponent(site.domain) +
-          '&reason=time_limit' +
-          '&used=' + usedSeconds +
-          '&limit=' + limitSeconds
+      chrome.tabs.get(tabId, (tab) => {
+        if (chrome.runtime.lastError || !tab) return;
+        chrome.tabs.update(tabId, {
+          url: blockedUrl(site, tab.url || '', 'time_limit') +
+            '&used=' + usedSeconds +
+            '&limit=' + limitSeconds
+        });
       });
     }
   }
@@ -182,6 +227,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.type === 'get_usage') {
     getCurrentUsageSeconds(message.domain).then(seconds => sendResponse({ seconds }));
+    return true;
+  }
+  if (message.type === 'get_weekly_stats') {
+    chrome.storage.local.get('usage').then(({ usage = {} }) => sendResponse({ usage }));
+    return true;
+  }
+  if (message.type === 'verify_pin') {
+    chrome.storage.sync.get('masterPin').then(({ masterPin }) => {
+      sendResponse({ ok: masterPin && masterPin === message.pin });
+    });
     return true;
   }
 });

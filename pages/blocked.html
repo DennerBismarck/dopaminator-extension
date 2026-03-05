@@ -18,6 +18,7 @@
       text-align: center;
       max-width: 480px;
       padding: 48px 32px;
+      width: 100%;
     }
     .icon { font-size: 72px; margin-bottom: 24px; }
     h1 {
@@ -41,7 +42,20 @@
     .usage {
       font-size: 14px;
       color: #888;
-      margin-bottom: 36px;
+      margin-bottom: 10px;
+    }
+    .progress-bar {
+      background: #0f3460;
+      border-radius: 4px;
+      height: 8px;
+      margin: 0 auto 28px;
+      width: 220px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      background: #e94560;
+      height: 100%;
+      border-radius: 4px;
     }
     .back-btn {
       background: #e94560;
@@ -56,22 +70,57 @@
     }
     .back-btn:hover { background: #c73652; }
     .reset-info {
-      margin-top: 20px;
+      margin-top: 16px;
       font-size: 13px;
       color: #555;
     }
-    .progress-bar {
-      background: #0f3460;
-      border-radius: 4px;
-      height: 8px;
-      margin: 12px auto;
-      width: 220px;
-      overflow: hidden;
+    /* PIN bypass */
+    .pin-section {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #0f3460;
     }
-    .progress-fill {
-      background: #e94560;
-      height: 100%;
-      border-radius: 4px;
+    .pin-section p {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 12px;
+    }
+    .pin-row {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+    .pin-row input {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 6px;
+      padding: 8px 14px;
+      color: #e0e0e0;
+      font-size: 14px;
+      width: 120px;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.15s;
+      letter-spacing: 4px;
+    }
+    .pin-row input:focus { border-color: #e94560; }
+    .pin-row button {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pin-row button:hover { border-color: #e94560; color: #e94560; }
+    #pin-error {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #e94560;
+      min-height: 16px;
     }
   </style>
 </head>
@@ -81,24 +130,38 @@
     <h1>Site Bloqueado</h1>
     <div class="domain" id="domain"></div>
     <div class="reason" id="reason"></div>
-    <div id="usage-section">
+
+    <div id="usage-section" style="display:none">
       <div class="usage" id="usage"></div>
       <div class="progress-bar" id="progress-bar" style="display:none">
         <div class="progress-fill" id="progress-fill"></div>
       </div>
     </div>
+
     <button class="back-btn" onclick="history.length > 1 ? history.back() : window.close()">
       &larr; Voltar
     </button>
     <div class="reset-info" id="reset-info"></div>
+
+    <div class="pin-section" id="pin-section" style="display:none">
+      <p>Tem certeza? Use seu PIN mestre para desbloquear por 30 minutos:</p>
+      <div class="pin-row">
+        <input type="password" id="pin-input" maxlength="8" placeholder="PIN" />
+        <button id="pin-btn">Desbloquear</button>
+      </div>
+      <div id="pin-error"></div>
+    </div>
   </div>
 
   <script>
     const params = new URLSearchParams(location.search);
     const domain = params.get('domain') || '';
     const reason = params.get('reason') || '';
+    const returnUrl = params.get('return') || ('https://' + domain);
     const used = parseInt(params.get('used') || '0');
     const limit = parseInt(params.get('limit') || '0');
+    const scheduleStart = params.get('scheduleStart');
+    const scheduleEnd = params.get('scheduleEnd');
 
     document.getElementById('domain').textContent = domain;
 
@@ -113,21 +176,49 @@
 
     if (reason === 'time_limit') {
       document.getElementById('reason').textContent = 'Voce atingiu o limite diario de tempo neste site.';
+      document.getElementById('usage-section').style.display = 'block';
       document.getElementById('usage').textContent = 'Usado: ' + formatTime(used) + ' / Limite: ' + formatTime(limit);
-
       const bar = document.getElementById('progress-bar');
       bar.style.display = 'block';
       document.getElementById('progress-fill').style.width = Math.min(100, Math.round(used / limit * 100)) + '%';
-
       const now = new Date();
       const midnight = new Date(now);
       midnight.setHours(24, 0, 0, 0);
       const hoursLeft = Math.round((midnight - now) / 3600000);
       document.getElementById('reset-info').textContent = 'O limite reseta a meia-noite (em ~' + hoursLeft + 'h).';
+    } else if (scheduleStart !== null) {
+      document.getElementById('reason').textContent = 'Este site esta bloqueado neste horario.';
+      document.getElementById('reset-info').textContent =
+        'Bloqueado das ' + scheduleStart + 'h ate ' + scheduleEnd + 'h.';
     } else {
       document.getElementById('reason').textContent = 'Este site esta bloqueado pelo Dopaminator.';
-      document.getElementById('usage-section').style.display = 'none';
     }
+
+    // Show PIN bypass if masterPin is configured
+    chrome.storage.sync.get('masterPin').then(({ masterPin }) => {
+      if (masterPin) {
+        document.getElementById('pin-section').style.display = 'block';
+      }
+    });
+
+    document.getElementById('pin-btn').addEventListener('click', async () => {
+      const pin = document.getElementById('pin-input').value;
+      const errEl = document.getElementById('pin-error');
+
+      const response = await chrome.runtime.sendMessage({ type: 'verify_pin', pin });
+      if (response?.ok) {
+        await chrome.runtime.sendMessage({ type: 'confirm_allow', domain });
+        window.location.href = returnUrl;
+      } else {
+        errEl.textContent = 'PIN incorreto.';
+        document.getElementById('pin-input').value = '';
+        setTimeout(() => { errEl.textContent = ''; }, 2000);
+      }
+    });
+
+    document.getElementById('pin-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('pin-btn').click();
+    });
   </script>
 </body>
 </html>

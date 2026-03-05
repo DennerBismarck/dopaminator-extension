@@ -8,24 +8,69 @@
   <div class="header">
     <img src="../images/icon-32.png" alt="Dopaminator" width="24" height="24">
     <h1>Dopaminator</h1>
+    <div class="tabs">
+      <button class="tab active" data-tab="sites">Sites</button>
+      <button class="tab" data-tab="stats">Stats</button>
+      <button class="tab" data-tab="config">Config</button>
+    </div>
   </div>
 
-  <div id="sites-list"></div>
+  <!-- TAB: SITES -->
+  <div id="tab-sites" class="tab-content active">
+    <div id="sites-list"></div>
 
-  <div class="add-section">
-    <h2>Adicionar site</h2>
-    <div class="form">
-      <input id="domain-input" type="text" placeholder="ex: instagram.com" />
-      <select id="mode-select">
-        <option value="blocked">Bloqueado totalmente</option>
-        <option value="time_limit">Limite de tempo diario</option>
-        <option value="confirm">Pedir confirmacao</option>
-      </select>
-      <div id="time-limit-row" class="hidden">
-        <input id="limit-input" type="number" min="1" max="1440" value="30" />
-        <span>min/dia</span>
+    <div class="add-section">
+      <h2>Adicionar site</h2>
+      <div class="form">
+        <input id="domain-input" type="text" placeholder="ex: instagram.com ou youtube.com/shorts" />
+        <select id="mode-select">
+          <option value="blocked">Bloqueado totalmente</option>
+          <option value="time_limit">Limite de tempo diario</option>
+          <option value="confirm">Pedir confirmacao</option>
+        </select>
+
+        <div id="time-limit-row" class="hidden">
+          <input id="limit-input" type="number" min="1" max="1440" value="30" />
+          <span>min/dia</span>
+        </div>
+
+        <div class="schedule-toggle">
+          <label>
+            <input type="checkbox" id="schedule-check" />
+            Bloquear apenas em certo horario
+          </label>
+        </div>
+        <div id="schedule-row" class="hidden">
+          <span>Das</span>
+          <input id="schedule-start" type="number" min="0" max="23" value="22" class="hour-input" />
+          <span>h ate</span>
+          <input id="schedule-end" type="number" min="0" max="23" value="8" class="hour-input" />
+          <span>h</span>
+        </div>
+
+        <button id="add-btn">Adicionar</button>
       </div>
-      <button id="add-btn">Adicionar</button>
+    </div>
+  </div>
+
+  <!-- TAB: STATS -->
+  <div id="tab-stats" class="tab-content hidden">
+    <div id="stats-content"></div>
+  </div>
+
+  <!-- TAB: CONFIG -->
+  <div id="tab-config" class="tab-content hidden">
+    <div class="config-section">
+      <h2>PIN mestre</h2>
+      <p class="config-desc">
+        O PIN permite desbloquear qualquer site temporariamente a partir da tela de bloqueio.
+      </p>
+      <div class="pin-form">
+        <input id="pin-input" type="password" maxlength="8" placeholder="Novo PIN (numeros)" />
+        <button id="pin-save-btn">Salvar</button>
+      </div>
+      <div id="pin-status"></div>
+      <button id="pin-clear-btn" class="btn-secondary">Remover PIN</button>
     </div>
   </div>
 
