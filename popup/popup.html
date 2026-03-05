@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <img src="../images/icon-32.png" alt="Dopaminator" width="24" height="24">
+    <h1>Dopaminator</h1>
+  </div>
+
+  <div id="sites-list"></div>
+
+  <div class="add-section">
+    <h2>Adicionar site</h2>
+    <div class="form">
+      <input id="domain-input" type="text" placeholder="ex: instagram.com" />
+      <select id="mode-select">
+        <option value="blocked">Bloqueado totalmente</option>
+        <option value="time_limit">Limite de tempo diario</option>
+        <option value="confirm">Pedir confirmacao</option>
+      </select>
+      <div id="time-limit-row" class="hidden">
+        <input id="limit-input" type="number" min="1" max="1440" value="30" />
+        <span>min/dia</span>
+      </div>
+      <button id="add-btn">Adicionar</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

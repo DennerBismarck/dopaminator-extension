@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Site Bloqueado - Dopaminator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .card {
+      text-align: center;
+      max-width: 480px;
+      padding: 48px 32px;
+    }
+    .icon { font-size: 72px; margin-bottom: 24px; }
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #e94560;
+      margin-bottom: 8px;
+    }
+    .domain {
+      font-size: 18px;
+      color: #aaa;
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+    .reason {
+      font-size: 16px;
+      color: #e0e0e0;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+    .usage {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 36px;
+    }
+    .back-btn {
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 36px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .back-btn:hover { background: #c73652; }
+    .reset-info {
+      margin-top: 20px;
+      font-size: 13px;
+      color: #555;
+    }
+    .progress-bar {
+      background: #0f3460;
+      border-radius: 4px;
+      height: 8px;
+      margin: 12px auto;
+      width: 220px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      background: #e94560;
+      height: 100%;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">&#x1F9E0;</div>
+    <h1>Site Bloqueado</h1>
+    <div class="domain" id="domain"></div>
+    <div class="reason" id="reason"></div>
+    <div id="usage-section">
+      <div class="usage" id="usage"></div>
+      <div class="progress-bar" id="progress-bar" style="display:none">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+    </div>
+    <button class="back-btn" onclick="history.length > 1 ? history.back() : window.close()">
+      &larr; Voltar
+    </button>
+    <div class="reset-info" id="reset-info"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const domain = params.get('domain') || '';
+    const reason = params.get('reason') || '';
+    const used = parseInt(params.get('used') || '0');
+    const limit = parseInt(params.get('limit') || '0');
+
+    document.getElementById('domain').textContent = domain;
+
+    function formatTime(s) {
+      if (s < 60) return s + 's';
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + 'min';
+      const h = Math.floor(m / 60);
+      const r = m % 60;
+      return r > 0 ? h + 'h ' + r + 'min' : h + 'h';
+    }
+
+    if (reason === 'time_limit') {
+      document.getElementById('reason').textContent = 'Voce atingiu o limite diario de tempo neste site.';
+      document.getElementById('usage').textContent = 'Usado: ' + formatTime(used) + ' / Limite: ' + formatTime(limit);
+
+      const bar = document.getElementById('progress-bar');
+      bar.style.display = 'block';
+      document.getElementById('progress-fill').style.width = Math.min(100, Math.round(used / limit * 100)) + '%';
+
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      const hoursLeft = Math.round((midnight - now) / 3600000);
+      document.getElementById('reset-info').textContent = 'O limite reseta a meia-noite (em ~' + hoursLeft + 'h).';
+    } else {
+      document.getElementById('reason').textContent = 'Este site esta bloqueado pelo Dopaminator.';
+      document.getElementById('usage-section').style.display = 'none';
+    }
+  </script>
+</body>
+</html>
